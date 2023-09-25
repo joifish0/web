@@ -10,4 +10,3 @@ SQLAlchemy==1.4.29
 Werkzeug==2.0.2
 web.py
 lxml
-libxslt
