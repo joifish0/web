@@ -447,6 +447,8 @@ class SegmentToolWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.greenSliceManager.reinit()
         self.yellowSliceManager.reinit()
         self.ui.ShowThreeD.setChecked(0)
+        self.ui.Crossing.setChecked(0)
+        self.ui.SliceIntersect.setChecked(0)
 
 
     #根据布局索引设置布局

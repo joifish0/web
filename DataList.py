@@ -24,25 +24,6 @@ class DataList(ScriptedLoadableModule):
        
 
 
-class CustomDelegate(qt.QStyledItemDelegate):
-    def paint(self, painter, option, index):
-        # 绘制背景
-        painter.save()
-        painter.setRenderHint(qt.QPainter.Antialiasing)
-        painter.setPen(qt.Qt.NoPen)
-        painter.setBrush(qt.Qt.white)
-        painter.drawRoundedRect(option.rect, 5, 5)
-        painter.restore()
-
-        # 绘制文本
-        option = qt.QStyleOptionViewItem(option)
-        self.initStyleOption(option, index)
-        painter.save()
-        painter.setPen(option.palette.color(qt.QPalette.Text))
-        painter.drawText(option.rect, qt.Qt.AlignCenter, option.text)
-        painter.restore()
-
-
 
 class DataListWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
@@ -66,15 +47,12 @@ class DataListWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         uiWidget.setMRMLScene(slicer.mrmlScene)
         self.InitArguments()
 
-        self.ui.tableWidget.itemDoubleClicked.connect(self.DataSelect)
+        self.ui.tableWidget.cellClicked.connect(self.DataSelect)
         self.ui.tableWidget.setShowGrid(False)#隐藏表格
         self.ui.tableWidget.horizontalHeader().setSectionResizeMode(qt.QHeaderView.Stretch)#自适应宽
-        #self.ui.tableWidget.setItemDelegate(CustomDelegate())#设置自定义委托
-        self.ui.tableWidget.setStyleSheet("QTableWidget::item:selected { background-color: #ffffff;color: rgb(47,150,241);border-left:4px solid rgb(47,150,241);}QTableWidget{font: 700 12pt '思源雅黑';border:none;background-color:transparent;}QTableWidget::item{color:#818181;}")
         # 3D视图测试数据
         self.mainWindowInit()
         self.initList()
-
 
 
 
@@ -115,11 +93,6 @@ class DataListWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         
         self.DataListNameLabel = slicer.util.mainWindow().findChild(qt.QLabel,"DataListName")
         self.DataListNameLabel.setText(self.DataSetName)
-        if len(self.DataSetName)<=5:
-            self.ui.label.setText(self.DataSetName)
-        else:
-            self.ui.label.setText(self.DataSetName[0:5]+"...")
-            self.ui.label.setToolTip(self.DataSetName)
         self.DataIDLabel = slicer.util.mainWindow().findChild(qt.QLabel,"DataID")
         self.DataIDLabel.setText(self.FirstID)
         
@@ -169,7 +142,7 @@ class DataListWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # 隐藏工具栏等窗口
         slicer.util.setToolbarsVisible(0)
         slicer.util.setMenuBarsVisible(0)
-        slicer.util.setPythonConsoleVisible(0)
+        slicer.util.setPythonConsoleVisible(1)
         slicer.util.setStatusBarVisible(0)
         pane=slicer.util.findChild(slicer.util.mainWindow(),'PanelDockWidget')
         pane.hide()
@@ -183,24 +156,16 @@ class DataListWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # 将布局设置为父窗口的布局
         widget_Module.setLayout(layout)
 
-        widget_PatientList=slicer.util.findChild(slicer.util.mainWindow(),'PatientList')
+        widget_PatientList=slicer.util.findChild(slicer.util.mainWindow(),'widget_PatientList')
         # 创建垂直布局管理器
-        layout = qt.QHBoxLayout()
-        layout.setContentsMargins(0,0,0,0)
+        layout = qt.QVBoxLayout()
+        layout.setContentsMargins(0,0,10,0)
         # 将子窗口添加到布局中
         layout.addWidget(self.ui.widget_list)
-
         # 将布局设置为父窗口的布局
         widget_PatientList.setLayout(layout)
         pane=slicer.util.findChild(slicer.util.mainWindow(),'PanelDockWidget')
         pane.hide()
-
-        widget_shadow=slicer.util.findChild(slicer.util.mainWindow(),'widget_shadow')
-        shadow_effect = qt.QGraphicsDropShadowEffect()
-        shadow_effect.setColor(qt.QColor(0, 0, 0, 100))
-        shadow_effect.setOffset(10, 0)
-        shadow_effect.setBlurRadius(20)
-        widget_shadow.setGraphicsEffect(shadow_effect)
 
 
 
@@ -209,15 +174,12 @@ class DataListWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         segmentTool = slicer.modules.segmenttool.widgetRepresentation().self()
         if self.DataType == '2d':#加载2D数据
-            self.DataListNameLabel.setVisible(0)
             self.initTwoDList()
             self.DataLoad()
         elif self.DataType == "3d":#加载3D数据
-            self.DataListNameLabel.setVisible(0)
             self.initThreeDList()   
             self.DataLoad()         
         elif self.DataType == "video":#加载视频
-            self.DataListNameLabel.setVisible(1)
             segmentTool.ui.stackedWidget.setCurrentIndex(0)
             widget_PatientList=slicer.util.findChild(slicer.util.mainWindow(),'widget_PatientList')
             widget_PatientList.hide()
@@ -255,8 +217,7 @@ class DataListWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.tableWidget.setCurrentCell(self.CurrentDataIndex, 0)
 
 
-    def DataSelect(self,item):
-        print(item.text())
+    def DataSelect(self,item=None):
         self.PreDataIndex = self.CurrentDataIndex
         segmentTool = slicer.modules.segmenttool.widgetRepresentation().self()
         
@@ -285,27 +246,29 @@ class DataListWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         
     def getSavePath(self):
         path=self.FielPaths[self.CurrentDataIndex]
-        path=os.path.normpath(path)
+        # path=os.path.normpath(path)
+        # path=path.replace('\\','/')
         file_name, file_extension = os.path.splitext(path)
         if self.DataType=='3d' and not (path.endswith('.nii')):
             if file_name[-1]=="/":
                 file_name=file_name[0:-1]
-            if file_name[-2:]=="//" or file_name[-2:]=="\\":
+            if file_name[-2:]=="//":
                 file_name=file_name[0:-2]
-            if file_name[-4:]=="\\\\":
-                file_name=file_name[0:-4]
+            while file_name.endswith("\\"):
+                file_name=file_name[0:-1]
             return file_name+'___mask.nii'
         return file_name+'___mask.nii'
         
     def DataSave(self):        
         # 获取当前的Segmentation节点
-        segmentation_node = slicer.util.getNode('Segmentation')
+        segmentation_node = slicer.modules.segmenttool.widgetRepresentation().self().segmentationNode
+        volumeNode=slicer.modules.segmenttool.widgetRepresentation().self().masterVolumeNode
         # 构建保存路径
         save_file_path = self.getSavePath()
 
         # Create a labelmap volume node from the segmentation
         labelmap_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
-        slicer.modules.segmentations.logic().ExportVisibleSegmentsToLabelmapNode(segmentation_node, labelmap_node)
+        slicer.modules.segmentations.logic().ExportVisibleSegmentsToLabelmapNode(segmentation_node, labelmap_node,volumeNode)
 
         # 将Labelmap节点保存为NIfTI文件
         slicer.util.saveNode(labelmap_node, save_file_path)
@@ -331,6 +294,10 @@ class DataListWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         #清空当前数据
         slicer.mrmlScene.Clear()
+        #设置布局
+        if self.DataType=='3d':
+            slicer.app.layoutManager().setLayout(0)
+            
 
         #加载数据
         if os.path.isdir(self.FielPaths[self.CurrentDataIndex]):
